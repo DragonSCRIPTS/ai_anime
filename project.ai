@@ -1,1 +1,56 @@
-server 1
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
+from diffusers import StableDiffusionPipeline
+import torch
+
+# Inicializando o modelo de IA
+def carregar_pipeline():
+    modelo = "CompVis/stable-diffusion-v1-4"  # Ou use um modelo ajustado para anime
+    pipeline = StableDiffusionPipeline.from_pretrained(modelo, torch_dtype=torch.float16)
+    pipeline = pipeline.to("cuda")  # Use GPU para acelerar
+    return pipeline
+
+pipeline = carregar_pipeline()
+
+# Função para gerar imagens baseadas na descrição
+def gerar_personagem(descricao, output_path="anime_character.png"):
+    print(f"Gerando imagem com a descrição: {descricao}")
+    imagem = pipeline(descricao, guidance_scale=7.5).images[0]  # guidance_scale ajusta a criatividade
+    imagem.save(output_path)
+    return output_path
+
+# Comando /start
+def start(update, context):
+    update.message.reply_text(
+        "Olá! Descreva o personagem de anime que você deseja criar.\n"
+        "Exemplo: 'Rapaz com cabelos prateados, olhos azuis brilhantes, usando uma jaqueta preta e segurando uma katana.'"
+    )
+
+# Receber descrição e gerar imagem
+def gerar_imagem(update, context):
+    descricao = update.message.text.strip()
+    if not descricao:
+        update.message.reply_text("Por favor, forneça uma descrição detalhada do personagem.")
+        return
+
+    update.message.reply_text(f"Gerando sua imagem com base na descrição: {descricao}")
+    try:
+        caminho_imagem = gerar_personagem(descricao)
+        context.bot.send_photo(chat_id=update.effective_chat.id, photo=open(caminho_imagem, "rb"))
+    except Exception as e:
+        update.message.reply_text(f"Erro ao gerar a imagem: {e}")
+
+# Configuração do bot
+def main():
+    TOKEN = "7407533619:AAGNcrfilhJTX0rwiT-zhdhpQuKwHrNSpmg"  # NÃO USE EM AMBIENTES PÚBLICOS
+    updater = Updater(TOKEN, use_context=True)
+    dp = updater.dispatcher
+
+    # Comandos
+    dp.add_handler(CommandHandler("start", start))
+    dp.add_handler(MessageHandler(Filters.text, gerar_imagem))
+
+    updater.start_polling()
+    updater.idle()
+
+if __name__ == "__main__":
+    main()
